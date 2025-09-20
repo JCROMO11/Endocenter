@@ -1,0 +1,79 @@
+# Development configuration - RTX 5070 Optimized
+app:
+  name: "EndoCenter MLOps"
+  version: "1.0.0"
+  debug: true
+  environment: "development"
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  prefix: "/api/v1"
+  docs_url: "/docs"
+  redoc_url: "/redoc"
+
+# GPU Configuration for RTX 5070
+gpu:
+  enabled: true
+  device: "cuda:0"
+  memory_limit: 11000  # MB
+  optimization_level: "high"
+
+# Model Configuration - GPU Optimized
+model:
+  embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  device: "cuda"
+  batch_size: 128  # Large batch for RTX 5070
+  precision: "fp16"  # Mixed precision for performance
+  top_k_results: 10
+  chunk_size: 500
+  chunk_overlap: 100
+
+# FAISS Configuration - GPU Optimized
+faiss:
+  use_gpu: true
+  gpu_memory_limit: 8000  # MB for FAISS
+  index_type: "IndexFlatL2"
+  training_batch_size: 10000
+
+# LLM Configuration
+llm:
+  api_url: "http://localhost:11434/api/generate"
+  model: "llama3"
+  timeout: 30
+  max_retries: 3
+
+# Data Configuration
+data:
+  base_dir: "./data"
+  embeddings_dir: "./data/embeddings"
+  chunks_dir: "./data/chunks"
+  preprocessed_dir: "./data/preprocessed"
+  raw_dir: "./data/raw"
+
+# Performance Monitoring
+monitoring:
+  gpu_monitoring: true
+  memory_monitoring: true
+  performance_logging: true
+
+# Diseases Configuration
+diseases:
+  cushing: "Síndrome de Cushing"
+  diabetes_tipo_2: "Diabetes tipo 2"
+  hipotiroidismo: "Hipotiroidismo"
+  insuficiencia_suprarrenal: "Insuficiencia suprarrenal"
+  osteoporosis: "Osteoporosis"
+  sop_sindrome_ovario_poliquistico: "Síndrome de ovario poliquístico (SOP)"
+  greenspan: "Libro de Greenspan"
+
+# Database Configuration - PostgreSQL
+database:
+  host: "localhost"
+  port: 5432
+  name: "endocenter"
+  user: "endouser"
+  password: "endopassword"
+  pool_size: 10
+  max_overflow: 20
+  echo: true

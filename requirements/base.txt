@@ -1,0 +1,30 @@
+# Core ML/AI - Versiones compatibles
+faiss-gpu==1.7.2
+sentence-transformers>=3.0.0
+numpy>=1.21.0,<2.0  # NumPy 1.x para compatibilidad FAISS
+pandas>=2.1.0
+
+# API Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Data Processing
+PyMuPDF>=1.23.0
+requests>=2.31.0
+httpx>=0.25.0
+
+# Configuration
+pyyaml>=6.0.1
+python-dotenv>=1.0.0
+
+# Database
+sqlalchemy>=2.0.23
+psycopg2-binary>=2.9.7
+
+# Monitoring & Logging
+loguru>=0.7.2
+
+# Utilities
+typing-extensions>=4.8.0

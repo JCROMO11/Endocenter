@@ -1,0 +1,68 @@
+# Production configuration - GPU Optimized
+app:
+  name: "EndoCenter MLOps"
+  version: "1.0.0"
+  debug: false
+  environment: "production"
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  prefix: "/api/v1"
+  docs_url: null
+  redoc_url: null
+
+# GPU Configuration for Production
+gpu:
+  enabled: true
+  device: "cuda:0"
+  memory_limit: 10000
+  optimization_level: "maximum"
+
+model:
+  embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  device: "cuda"
+  batch_size: 256  # Larger batch for production
+  precision: "fp16"
+  top_k_results: 10
+
+faiss:
+  use_gpu: true
+  gpu_memory_limit: 8000
+  index_type: "IndexFlatL2"
+
+llm:
+  api_url: "${LLM_API_URL}"
+  model: "${LLM_MODEL}"
+  timeout: 60
+  max_retries: 5
+
+data:
+  base_dir: "/app/data"
+  embeddings_dir: "/app/data/embeddings"
+  chunks_dir: "/app/data/chunks"
+
+logging:
+  level: "WARNING"
+  format: "json"
+  file: "/app/logs/app.log"
+
+security:
+  secret_key: "${SECRET_KEY}"
+  cors_origins: []
+
+monitoring:
+  gpu_monitoring: true
+  alerting_enabled: true
+  metrics_port: 9090
+
+# DATABASE CONFIG - PostgreSQL
+database:
+  host: "localhost"
+  port: 5432
+  name: "endocenter_dev"
+  user: "endocenter_user"
+  password: "endocenter_pass"
+  pool_size: 5
+  max_overflow: 10
+  echo: true  # SQL debugging en dev

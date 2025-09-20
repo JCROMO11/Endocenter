@@ -1,0 +1,5 @@
+# PyTorch GPU - Instalación manual por índice especial
+# Usar: pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu129
+
+# This file is for documentation only
+# PyTorch nightly is required for RTX 5070 (sm_120 architecture)

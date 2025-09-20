@@ -1,0 +1,31 @@
+-r base.txt
+
+# Development tools
+black>=23.9.0
+flake8>=6.0.0
+mypy>=1.6.0
+isort>=5.12.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+httpx>=0.25.0
+
+# Documentation
+mkdocs>=1.5.0
+mkdocs-material>=9.4.0
+
+# Jupyter
+jupyter>=1.0.0
+ipykernel>=6.25.0
+
+# GPU monitoring
+nvidia-ml-py>=12.535.0
+gpustat>=1.1.0
+
+# Database tools
+alembic>=1.12.0          # Migraciones
+psycopg2-binary>=2.9.7   # PostgreSQL driver
+pgcli>=3.5.0             # CLI mejorado para PostgreSQL
+sqlalchemy-utils>=0.41.0 # Utilities adicionales
