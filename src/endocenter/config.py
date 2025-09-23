@@ -81,11 +81,14 @@ class Settings(BaseSettings):
     # DATABASE CONFIG
     # =============================================================================
     db_host: str = 'localhost'
-    db_port: int = 5432
+    db_port: int = 5433
     db_name: str = 'endocenter'
-    db_user: str = 'endouser'
-    db_password: str = 'endopassword'
-    database_url: str | None = None
+    db_user: str = 'endocenter_user'
+    db_password: str = 'endocenter_pass'
+    database_url: str = Field(
+        default="postgresql+psycopg2://endocenter_user:endocenter_pass@localhost:5433/endocenter",
+        description="Database connection URL",
+    )
     
     # =============================================================================
     # MONITORING CONFIG
