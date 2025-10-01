@@ -78,17 +78,34 @@ class Settings(BaseSettings):
     raw_dir: Path = Path("./data/raw")
     
     # =============================================================================
-    # DATABASE CONFIG
+    # DATABASE CONFIG - PostgreSQL
     # =============================================================================
     db_host: str = 'localhost'
-    db_port: int = 5433
+    db_port: int = 5432
     db_name: str = 'endocenter'
     db_user: str = 'endocenter_user'
     db_password: str = 'endocenter_pass'
-    database_url: str = Field(
-        default="postgresql+psycopg2://endocenter_user:endocenter_pass@localhost:5433/endocenter",
-        description="Database connection URL",
-    )
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_echo: bool = False
+    
+    # Database URL - construida automáticamente
+    database_url: Optional[str] = None
+    
+    @validator('database_url', always=True)
+    def build_database_url(cls, v, values):
+        """Construir database URL si no está definida"""
+        if v is not None:
+            return v
+        
+        # Construir URL desde componentes individuales
+        user = values.get('db_user', 'endocenter_user')
+        password = values.get('db_password', 'endocenter_pass')
+        host = values.get('db_host', 'localhost')
+        port = values.get('db_port', 5432)
+        db_name = values.get('db_name', 'endocenter')
+        
+        return f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
     
     # =============================================================================
     # MONITORING CONFIG
@@ -190,15 +207,15 @@ class GPUManager:
         """Optimizar GPU para inferencia"""
         if torch.cuda.is_available():
             # Optimizaciones específicas para RTX 5070
-            torch.backends.cudnn.benchmark = True  # Optimize for consistent input sizes
-            torch.backends.cudnn.deterministic = False  # Allow non-deterministic for speed
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.deterministic = False
             
             # Set memory management
             if hasattr(torch.cuda, 'set_per_process_memory_fraction'):
-                memory_fraction = self.settings.gpu_memory_limit / 12000  # 12GB total VRAM
+                memory_fraction = self.settings.gpu_memory_limit / 12000
                 torch.cuda.set_per_process_memory_fraction(memory_fraction)
             
-            print(f"✅ GPU optimizado para inferencia: {self.get_device_info()['gpu_name']}")
+            print(f"✅ GPU optimizado: {self.get_device_info()['gpu_name']}")
         
     def clear_cache(self):
         """Limpiar cache GPU"""
@@ -212,9 +229,9 @@ class GPUManager:
             return {"error": "CUDA no disponible"}
         
         return {
-            "allocated": torch.cuda.memory_allocated() / 1024**3,  # GB
-            "reserved": torch.cuda.memory_reserved() / 1024**3,   # GB
-            "max_allocated": torch.cuda.max_memory_allocated() / 1024**3,  # GB
+            "allocated": torch.cuda.memory_allocated() / 1024**3,
+            "reserved": torch.cuda.memory_reserved() / 1024**3,
+            "max_allocated": torch.cuda.max_memory_allocated() / 1024**3,
         }
 
 
@@ -272,7 +289,6 @@ class ConfigManager:
 # INSTANCIAS GLOBALES
 # =============================================================================
 
-# Singleton instances
 _config_manager = ConfigManager()
 
 def get_settings(environment: str = None) -> Settings:
@@ -298,7 +314,7 @@ def get_device_config() -> Dict:
         "faiss_gpu": settings.faiss_gpu_enabled and device_info["cuda_available"],
     }
 
-# Instancia global para importación directa
+# Instancia global
 settings = get_settings()
 gpu_manager = get_gpu_manager()
 
@@ -323,42 +339,29 @@ def setup_gpu_optimizations():
     """Setup completo de optimizaciones GPU"""
     gpu_manager.optimize_for_inference()
     
-    # Print configuration summary
     device_config = get_device_config()
-    print("🚀 EndoCenter MLOps - GPU Configuration")
+    print("🚀 EndoCenter MLOps - Configuration")
     print("=" * 50)
     print(f"📱 App: {settings.app_name} v{settings.app_version}")
     print(f"🌍 Environment: {settings.environment}")
+    print(f"🗄️ Database: {settings.database_url}")
     print(f"🎯 Device: {device_config['device']}")
     print(f"🔢 Batch Size: {device_config['batch_size']}")
-    print(f"🎮 GPU: {device_config['gpu_info']['gpu_name'] if device_config['gpu_info']['cuda_available'] else 'CPU'}")
-    print(f"💾 VRAM: {device_config['gpu_info']['total_memory'] / 1024**3:.1f}GB" if device_config['gpu_info']['cuda_available'] else "N/A")
+    if device_config['gpu_info']['cuda_available']:
+        print(f"🎮 GPU: {device_config['gpu_info']['gpu_name']}")
+        print(f"💾 VRAM: {device_config['gpu_info']['total_memory'] / 1024**3:.1f}GB")
     print(f"🔍 FAISS GPU: {device_config['faiss_gpu']}")
     print(f"🏥 Diseases: {len(settings.diseases)}")
     print("=" * 50)
 
 
-# =============================================================================
-# DEMO/TEST FUNCTION
-# =============================================================================
-
 if __name__ == "__main__":
-    # Demostración y test de configuración
     print("🔧 Testing EndoCenter Configuration...")
-    
-    # Setup GPU optimizations
     setup_gpu_optimizations()
     
-    # Test device config
-    device_config = get_device_config()
-    print(f"\n📊 Device Config: {device_config}")
-    
-    # Test GPU memory
     if torch.cuda.is_available():
         memory_stats = gpu_manager.get_memory_stats()
-        print(f"💾 GPU Memory: {memory_stats}")
+        print(f"\n💾 GPU Memory: {memory_stats}")
     
-    # Test disease mapping
     print(f"\n🏥 Disease example: {get_disease_display_name('diabetes_tipo_2')}")
-    
     print("\n✅ Configuration test completed!")
