@@ -1,8 +1,8 @@
-"""initial schema clean
+"""Initial migration with fixed relationships
 
-Revision ID: 45946d541c40
+Revision ID: fdd1ed4eaa0a
 Revises: 
-Create Date: 2025-10-01 02:01:42.892365
+Create Date: 2025-10-01 12:11:11.834494
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '45946d541c40'
+revision = 'fdd1ed4eaa0a'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -40,15 +40,9 @@ def upgrade():
     sa.Column('measurement_end', sa.DateTime(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('created_by', sa.String(length=100), nullable=True),
-    sa.CheckConstraint('failed_predictions >= 0', name='non_negative_failed_predictions'),
-    sa.CheckConstraint('successful_predictions + failed_predictions <= total_predictions', name='valid_prediction_counts'),
-    sa.CheckConstraint('successful_predictions >= 0', name='non_negative_successful_predictions'),
-    sa.CheckConstraint('total_predictions >= 0', name='non_negative_total_predictions'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('idx_model_metrics_name_version', 'model_metrics', ['model_name', 'model_version'], unique=False)
-    op.create_index('idx_model_metrics_period', 'model_metrics', ['measurement_start', 'measurement_end'], unique=False)
-    op.create_index('idx_model_metrics_type', 'model_metrics', ['model_type'], unique=False)
     op.create_index(op.f('ix_model_metrics_id'), 'model_metrics', ['id'], unique=False)
     op.create_table('system_metrics',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -69,11 +63,6 @@ def upgrade():
     sa.Column('error_rate_percent', sa.Float(), nullable=True),
     sa.Column('timeout_rate_percent', sa.Float(), nullable=True),
     sa.Column('recorded_at', sa.DateTime(), nullable=False),
-    sa.CheckConstraint('active_consultations >= 0', name='non_negative_active_consultations'),
-    sa.CheckConstraint('active_users >= 0', name='non_negative_active_users'),
-    sa.CheckConstraint('cpu_percent IS NULL OR (cpu_percent >= 0 AND cpu_percent <= 100)', name='valid_cpu_percent'),
-    sa.CheckConstraint('gpu_percent IS NULL OR (gpu_percent >= 0 AND gpu_percent <= 100)', name='valid_gpu_percent'),
-    sa.CheckConstraint('memory_percent IS NULL OR (memory_percent >= 0 AND memory_percent <= 100)', name='valid_memory_percent'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('idx_system_metrics_recorded', 'system_metrics', ['recorded_at'], unique=False)
@@ -122,7 +111,7 @@ def upgrade():
     sa.Column('is_verified', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id')
     )
@@ -157,13 +146,10 @@ def upgrade():
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('processed_at', sa.DateTime(), nullable=True),
     sa.CheckConstraint('file_size_bytes > 0', name='positive_file_size'),
-    sa.CheckConstraint('quality_score IS NULL OR (quality_score >= 0 AND quality_score <= 1)', name='valid_quality_score'),
     sa.CheckConstraint('total_chunks >= 0', name='non_negative_chunks'),
-    sa.ForeignKeyConstraint(['uploaded_by'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['uploaded_by'], ['users.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('idx_medical_document_diseases', 'medical_documents', ['diseases_covered'], unique=False)
-    op.create_index('idx_medical_document_specialty', 'medical_documents', ['medical_specialty'], unique=False)
     op.create_index('idx_medical_document_status', 'medical_documents', ['status'], unique=False)
     op.create_index('idx_medical_document_type', 'medical_documents', ['document_type'], unique=False)
     op.create_index(op.f('ix_medical_documents_file_hash'), 'medical_documents', ['file_hash'], unique=True)
@@ -187,7 +173,7 @@ def upgrade():
     sa.Column('preferred_language', sa.String(length=10), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id')
     )
@@ -210,20 +196,16 @@ def upgrade():
     sa.Column('urgency_level', sa.Integer(), nullable=False),
     sa.Column('reported_count', sa.Integer(), nullable=False),
     sa.Column('diagnosis_correlation', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('created_by', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.Column('created_by', sa.Integer(), nullable=True),
-    sa.CheckConstraint('reported_count >= 0', name='non_negative_reported_count'),
     sa.CheckConstraint('urgency_level >= 1 AND urgency_level <= 5', name='valid_urgency_level'),
-    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('code'),
     sa.UniqueConstraint('name')
     )
-    op.create_index('idx_symptom_category', 'symptoms', ['category'], unique=False)
     op.create_index('idx_symptom_name', 'symptoms', ['name'], unique=False)
-    op.create_index('idx_symptom_specialty', 'symptoms', ['medical_specialty'], unique=False)
-    op.create_index('idx_symptom_urgency', 'symptoms', ['urgency_level'], unique=False)
     op.create_index(op.f('ix_symptoms_id'), 'symptoms', ['id'], unique=False)
     op.create_table('user_profiles',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -242,7 +224,7 @@ def upgrade():
     sa.Column('notification_preferences', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('user_id')
     )
@@ -260,47 +242,11 @@ def upgrade():
     sa.Column('notes', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ),
+    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_allergies_id'), 'allergies', ['id'], unique=False)
     op.create_index(op.f('ix_allergies_patient_id'), 'allergies', ['patient_id'], unique=False)
-    op.create_table('appointments',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('patient_id', sa.Integer(), nullable=False),
-    sa.Column('doctor_id', sa.Integer(), nullable=False),
-    sa.Column('appointment_type', sa.Enum('FIRST_TIME', 'CONSULTATION', 'FOLLOW_UP', 'EMERGENCY', 'ROUTINE_CHECKUP', name='appointmenttype'), nullable=False),
-    sa.Column('status', sa.Enum('REQUESTED', 'CONFIRMED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW', 'RESCHEDULED', name='appointmentstatus'), nullable=True),
-    sa.Column('scheduled_date', sa.Date(), nullable=False),
-    sa.Column('scheduled_time', sa.String(length=5), nullable=False),
-    sa.Column('duration_minutes', sa.Integer(), nullable=True),
-    sa.Column('timezone', sa.String(length=50), nullable=True),
-    sa.Column('location_type', sa.String(length=20), nullable=False),
-    sa.Column('meeting_link', sa.String(length=500), nullable=True),
-    sa.Column('office_address', sa.Text(), nullable=True),
-    sa.Column('chief_complaint', sa.Text(), nullable=True),
-    sa.Column('notes', sa.Text(), nullable=True),
-    sa.Column('preparation_instructions', sa.Text(), nullable=True),
-    sa.Column('consultation_fee', sa.Float(), nullable=True),
-    sa.Column('payment_status', sa.String(length=20), nullable=True),
-    sa.Column('is_follow_up', sa.Boolean(), nullable=True),
-    sa.Column('original_appointment_id', sa.Integer(), nullable=True),
-    sa.Column('requested_at', sa.DateTime(), nullable=True),
-    sa.Column('confirmed_at', sa.DateTime(), nullable=True),
-    sa.Column('started_at', sa.DateTime(), nullable=True),
-    sa.Column('completed_at', sa.DateTime(), nullable=True),
-    sa.Column('cancelled_at', sa.DateTime(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ),
-    sa.ForeignKeyConstraint(['original_appointment_id'], ['appointments.id'], ),
-    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_appointments_doctor_id'), 'appointments', ['doctor_id'], unique=False)
-    op.create_index(op.f('ix_appointments_id'), 'appointments', ['id'], unique=False)
-    op.create_index(op.f('ix_appointments_patient_id'), 'appointments', ['patient_id'], unique=False)
-    op.create_index(op.f('ix_appointments_scheduled_date'), 'appointments', ['scheduled_date'], unique=False)
     op.create_table('doctor_availability',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('doctor_id', sa.Integer(), nullable=False),
@@ -317,7 +263,7 @@ def upgrade():
     sa.Column('office_address', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ),
+    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_doctor_availability_doctor_id'), 'doctor_availability', ['doctor_id'], unique=False)
@@ -348,42 +294,13 @@ def upgrade():
     sa.Column('last_retrieved', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.CheckConstraint('chunk_index >= 0', name='non_negative_chunk_index'),
     sa.CheckConstraint('content_length > 0', name='positive_content_length'),
-    sa.CheckConstraint('retrieval_count >= 0', name='non_negative_retrieval_count'),
-    sa.ForeignKeyConstraint(['document_id'], ['medical_documents.id'], ),
+    sa.ForeignKeyConstraint(['document_id'], ['medical_documents.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('document_id', 'chunk_index', name='uq_document_chunk_index')
     )
-    op.create_index('idx_document_chunk_diseases', 'document_chunks', ['diseases_mentioned'], unique=False)
     op.create_index('idx_document_chunk_document', 'document_chunks', ['document_id'], unique=False)
-    op.create_index('idx_document_chunk_index', 'document_chunks', ['chunk_index'], unique=False)
-    op.create_index('idx_document_chunk_symptoms', 'document_chunks', ['symptoms_mentioned'], unique=False)
     op.create_index(op.f('ix_document_chunks_id'), 'document_chunks', ['id'], unique=False)
-    op.create_table('medical_history',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('patient_id', sa.Integer(), nullable=False),
-    sa.Column('doctor_id', sa.Integer(), nullable=True),
-    sa.Column('visit_date', sa.DateTime(), nullable=False),
-    sa.Column('chief_complaint', sa.Text(), nullable=True),
-    sa.Column('diagnosis', sa.Text(), nullable=False),
-    sa.Column('treatment_plan', sa.Text(), nullable=True),
-    sa.Column('symptoms', sa.Text(), nullable=True),
-    sa.Column('vital_signs', sa.Text(), nullable=True),
-    sa.Column('lab_results', sa.Text(), nullable=True),
-    sa.Column('notes', sa.Text(), nullable=True),
-    sa.Column('follow_up_required', sa.Boolean(), nullable=True),
-    sa.Column('follow_up_date', sa.DateTime(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ),
-    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_medical_history_doctor_id'), 'medical_history', ['doctor_id'], unique=False)
-    op.create_index(op.f('ix_medical_history_id'), 'medical_history', ['id'], unique=False)
-    op.create_index(op.f('ix_medical_history_patient_id'), 'medical_history', ['patient_id'], unique=False)
     op.create_table('medications',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('patient_id', sa.Integer(), nullable=False),
@@ -400,8 +317,8 @@ def upgrade():
     sa.Column('side_effects', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ),
-    sa.ForeignKeyConstraint(['prescribed_by'], ['doctors.id'], ),
+    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['prescribed_by'], ['doctors.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_medications_id'), 'medications', ['id'], unique=False)
@@ -431,18 +348,12 @@ def upgrade():
     sa.Column('reported_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('reported_via', sa.String(length=50), nullable=False),
-    sa.CheckConstraint("reported_via IN ('web_form', 'rag_chat', 'appointment', 'phone', 'mobile_app')", name='valid_reported_via'),
-    sa.CheckConstraint('duration_days IS NULL OR duration_days >= 0', name='non_negative_duration'),
-    sa.CheckConstraint('rag_relevance_score IS NULL OR (rag_relevance_score >= 0 AND rag_relevance_score <= 1)', name='valid_rag_relevance_score'),
-    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ),
-    sa.ForeignKeyConstraint(['symptom_id'], ['symptoms.id'], ),
+    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['symptom_id'], ['symptoms.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('patient_id', 'symptom_id', 'reported_at', name='uq_patient_symptom_report')
     )
-    op.create_index('idx_patient_symptom_active', 'patient_symptoms', ['is_active'], unique=False)
-    op.create_index('idx_patient_symptom_onset', 'patient_symptoms', ['onset_date'], unique=False)
     op.create_index('idx_patient_symptom_patient', 'patient_symptoms', ['patient_id'], unique=False)
-    op.create_index('idx_patient_symptom_severity', 'patient_symptoms', ['severity'], unique=False)
     op.create_index('idx_patient_symptom_symptom', 'patient_symptoms', ['symptom_id'], unique=False)
     op.create_index(op.f('ix_patient_symptoms_id'), 'patient_symptoms', ['id'], unique=False)
     op.create_table('rag_consultations',
@@ -481,30 +392,59 @@ def upgrade():
     sa.Column('gpu_device', sa.String(length=50), nullable=True),
     sa.Column('memory_used_mb', sa.Float(), nullable=True),
     sa.Column('converted_to_appointment', sa.Boolean(), nullable=False),
-    sa.Column('appointment_id', sa.Integer(), nullable=True),
     sa.Column('started_at', sa.DateTime(), nullable=False),
     sa.Column('completed_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.Column('ip_address', sa.String(length=45), nullable=True),
     sa.Column('user_agent', sa.Text(), nullable=True),
-    sa.CheckConstraint("consultation_type IN ('symptom_analysis', 'medication_inquiry', 'general_question', 'follow_up')", name='valid_consultation_type'),
-    sa.CheckConstraint("urgency_assessment IS NULL OR urgency_assessment IN ('low', 'medium', 'high', 'emergency')", name='valid_urgency'),
     sa.CheckConstraint('confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)', name='valid_confidence_score'),
-    sa.CheckConstraint('retry_count >= 0', name='non_negative_retry_count'),
-    sa.CheckConstraint('top_k_retrieved > 0', name='positive_top_k'),
-    sa.CheckConstraint('user_satisfaction_rating IS NULL OR (user_satisfaction_rating >= 1 AND user_satisfaction_rating <= 5)', name='valid_satisfaction_rating'),
-    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('idx_rag_consultation_converted', 'rag_consultations', ['converted_to_appointment'], unique=False)
-    op.create_index('idx_rag_consultation_patient', 'rag_consultations', ['patient_id'], unique=False)
-    op.create_index('idx_rag_consultation_started', 'rag_consultations', ['started_at'], unique=False)
     op.create_index('idx_rag_consultation_status', 'rag_consultations', ['status'], unique=False)
-    op.create_index('idx_rag_consultation_urgency', 'rag_consultations', ['urgency_assessment'], unique=False)
     op.create_index('idx_rag_consultation_user', 'rag_consultations', ['user_id'], unique=False)
     op.create_index(op.f('ix_rag_consultations_id'), 'rag_consultations', ['id'], unique=False)
     op.create_index(op.f('ix_rag_consultations_session_id'), 'rag_consultations', ['session_id'], unique=True)
+    op.create_table('appointments',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('patient_id', sa.Integer(), nullable=False),
+    sa.Column('doctor_id', sa.Integer(), nullable=False),
+    sa.Column('rag_consultation_id', sa.Integer(), nullable=True),
+    sa.Column('appointment_type', sa.Enum('FIRST_TIME', 'CONSULTATION', 'FOLLOW_UP', 'EMERGENCY', 'ROUTINE_CHECKUP', name='appointmenttype'), nullable=False),
+    sa.Column('status', sa.Enum('REQUESTED', 'CONFIRMED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW', 'RESCHEDULED', name='appointmentstatus'), nullable=True),
+    sa.Column('scheduled_date', sa.Date(), nullable=False),
+    sa.Column('scheduled_time', sa.String(length=5), nullable=False),
+    sa.Column('duration_minutes', sa.Integer(), nullable=True),
+    sa.Column('timezone', sa.String(length=50), nullable=True),
+    sa.Column('location_type', sa.String(length=20), nullable=False),
+    sa.Column('meeting_link', sa.String(length=500), nullable=True),
+    sa.Column('office_address', sa.Text(), nullable=True),
+    sa.Column('chief_complaint', sa.Text(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('preparation_instructions', sa.Text(), nullable=True),
+    sa.Column('consultation_fee', sa.Float(), nullable=True),
+    sa.Column('payment_status', sa.String(length=20), nullable=True),
+    sa.Column('is_follow_up', sa.Boolean(), nullable=True),
+    sa.Column('original_appointment_id', sa.Integer(), nullable=True),
+    sa.Column('requested_at', sa.DateTime(), nullable=True),
+    sa.Column('confirmed_at', sa.DateTime(), nullable=True),
+    sa.Column('started_at', sa.DateTime(), nullable=True),
+    sa.Column('completed_at', sa.DateTime(), nullable=True),
+    sa.Column('cancelled_at', sa.DateTime(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['original_appointment_id'], ['appointments.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['rag_consultation_id'], ['rag_consultations.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_appointments_doctor_id'), 'appointments', ['doctor_id'], unique=False)
+    op.create_index(op.f('ix_appointments_id'), 'appointments', ['id'], unique=False)
+    op.create_index(op.f('ix_appointments_patient_id'), 'appointments', ['patient_id'], unique=False)
+    op.create_index(op.f('ix_appointments_rag_consultation_id'), 'appointments', ['rag_consultation_id'], unique=False)
+    op.create_index(op.f('ix_appointments_scheduled_date'), 'appointments', ['scheduled_date'], unique=False)
     op.create_table('consultation_sources',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('consultation_id', sa.Integer(), nullable=False),
@@ -522,24 +462,14 @@ def upgrade():
     sa.Column('accuracy_score', sa.Float(), nullable=True),
     sa.Column('user_clicked', sa.Boolean(), nullable=False),
     sa.Column('retrieved_at', sa.DateTime(), nullable=False),
-    sa.CheckConstraint("retrieval_method IN ('semantic_search', 'keyword_search', 'hybrid', 'reranking')", name='valid_retrieval_method'),
-    sa.CheckConstraint('accuracy_score IS NULL OR (accuracy_score >= 0 AND accuracy_score <= 1)', name='valid_accuracy_score'),
-    sa.CheckConstraint('influence_weight IS NULL OR (influence_weight >= 0 AND influence_weight <= 1)', name='valid_influence_weight'),
-    sa.CheckConstraint('rank_position > 0', name='positive_rank_position'),
-    sa.CheckConstraint('relevance_score IS NULL OR (relevance_score >= 0 AND relevance_score <= 1)', name='valid_relevance_score'),
     sa.CheckConstraint('similarity_score >= 0 AND similarity_score <= 1', name='valid_similarity_score'),
-    sa.ForeignKeyConstraint(['chunk_id'], ['document_chunks.id'], ),
-    sa.ForeignKeyConstraint(['consultation_id'], ['rag_consultations.id'], ),
-    sa.ForeignKeyConstraint(['document_id'], ['medical_documents.id'], ),
+    sa.ForeignKeyConstraint(['chunk_id'], ['document_chunks.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['consultation_id'], ['rag_consultations.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['document_id'], ['medical_documents.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('consultation_id', 'chunk_id', name='uq_consultation_chunk')
     )
-    op.create_index('idx_consultation_source_chunk', 'consultation_sources', ['chunk_id'], unique=False)
     op.create_index('idx_consultation_source_consultation', 'consultation_sources', ['consultation_id'], unique=False)
-    op.create_index('idx_consultation_source_document', 'consultation_sources', ['document_id'], unique=False)
-    op.create_index('idx_consultation_source_rank', 'consultation_sources', ['rank_position'], unique=False)
-    op.create_index('idx_consultation_source_similarity', 'consultation_sources', ['similarity_score'], unique=False)
-    op.create_index('idx_consultation_source_used', 'consultation_sources', ['used_in_generation'], unique=False)
     op.create_index(op.f('ix_consultation_sources_id'), 'consultation_sources', ['id'], unique=False)
     op.create_table('embeddings',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -558,81 +488,87 @@ def upgrade():
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.CheckConstraint('embedding_dimension > 0', name='positive_embedding_dimension'),
-    sa.CheckConstraint('similarity_search_count >= 0', name='non_negative_search_count'),
-    sa.ForeignKeyConstraint(['chunk_id'], ['document_chunks.id'], ),
+    sa.ForeignKeyConstraint(['chunk_id'], ['document_chunks.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('chunk_id')
     )
-    op.create_index('idx_embedding_dimension', 'embeddings', ['embedding_dimension'], unique=False)
-    op.create_index('idx_embedding_gpu', 'embeddings', ['generated_with_gpu'], unique=False)
     op.create_index('idx_embedding_model', 'embeddings', ['model_name'], unique=False)
     op.create_index(op.f('ix_embeddings_id'), 'embeddings', ['id'], unique=False)
+    op.create_table('medical_history',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('patient_id', sa.Integer(), nullable=False),
+    sa.Column('doctor_id', sa.Integer(), nullable=True),
+    sa.Column('rag_consultation_id', sa.Integer(), nullable=True),
+    sa.Column('visit_date', sa.DateTime(), nullable=False),
+    sa.Column('chief_complaint', sa.Text(), nullable=True),
+    sa.Column('diagnosis', sa.Text(), nullable=False),
+    sa.Column('treatment_plan', sa.Text(), nullable=True),
+    sa.Column('symptoms', sa.Text(), nullable=True),
+    sa.Column('vital_signs', sa.Text(), nullable=True),
+    sa.Column('lab_results', sa.Text(), nullable=True),
+    sa.Column('notes', sa.Text(), nullable=True),
+    sa.Column('follow_up_required', sa.Boolean(), nullable=True),
+    sa.Column('follow_up_date', sa.DateTime(), nullable=True),
+    sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['doctor_id'], ['doctors.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['patient_id'], ['patients.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['rag_consultation_id'], ['rag_consultations.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_medical_history_doctor_id'), 'medical_history', ['doctor_id'], unique=False)
+    op.create_index(op.f('ix_medical_history_id'), 'medical_history', ['id'], unique=False)
+    op.create_index(op.f('ix_medical_history_patient_id'), 'medical_history', ['patient_id'], unique=False)
+    op.create_index(op.f('ix_medical_history_rag_consultation_id'), 'medical_history', ['rag_consultation_id'], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index(op.f('ix_medical_history_rag_consultation_id'), table_name='medical_history')
+    op.drop_index(op.f('ix_medical_history_patient_id'), table_name='medical_history')
+    op.drop_index(op.f('ix_medical_history_id'), table_name='medical_history')
+    op.drop_index(op.f('ix_medical_history_doctor_id'), table_name='medical_history')
+    op.drop_table('medical_history')
     op.drop_index(op.f('ix_embeddings_id'), table_name='embeddings')
     op.drop_index('idx_embedding_model', table_name='embeddings')
-    op.drop_index('idx_embedding_gpu', table_name='embeddings')
-    op.drop_index('idx_embedding_dimension', table_name='embeddings')
     op.drop_table('embeddings')
     op.drop_index(op.f('ix_consultation_sources_id'), table_name='consultation_sources')
-    op.drop_index('idx_consultation_source_used', table_name='consultation_sources')
-    op.drop_index('idx_consultation_source_similarity', table_name='consultation_sources')
-    op.drop_index('idx_consultation_source_rank', table_name='consultation_sources')
-    op.drop_index('idx_consultation_source_document', table_name='consultation_sources')
     op.drop_index('idx_consultation_source_consultation', table_name='consultation_sources')
-    op.drop_index('idx_consultation_source_chunk', table_name='consultation_sources')
     op.drop_table('consultation_sources')
+    op.drop_index(op.f('ix_appointments_scheduled_date'), table_name='appointments')
+    op.drop_index(op.f('ix_appointments_rag_consultation_id'), table_name='appointments')
+    op.drop_index(op.f('ix_appointments_patient_id'), table_name='appointments')
+    op.drop_index(op.f('ix_appointments_id'), table_name='appointments')
+    op.drop_index(op.f('ix_appointments_doctor_id'), table_name='appointments')
+    op.drop_table('appointments')
     op.drop_index(op.f('ix_rag_consultations_session_id'), table_name='rag_consultations')
     op.drop_index(op.f('ix_rag_consultations_id'), table_name='rag_consultations')
     op.drop_index('idx_rag_consultation_user', table_name='rag_consultations')
-    op.drop_index('idx_rag_consultation_urgency', table_name='rag_consultations')
     op.drop_index('idx_rag_consultation_status', table_name='rag_consultations')
-    op.drop_index('idx_rag_consultation_started', table_name='rag_consultations')
-    op.drop_index('idx_rag_consultation_patient', table_name='rag_consultations')
-    op.drop_index('idx_rag_consultation_converted', table_name='rag_consultations')
     op.drop_table('rag_consultations')
     op.drop_index(op.f('ix_patient_symptoms_id'), table_name='patient_symptoms')
     op.drop_index('idx_patient_symptom_symptom', table_name='patient_symptoms')
-    op.drop_index('idx_patient_symptom_severity', table_name='patient_symptoms')
     op.drop_index('idx_patient_symptom_patient', table_name='patient_symptoms')
-    op.drop_index('idx_patient_symptom_onset', table_name='patient_symptoms')
-    op.drop_index('idx_patient_symptom_active', table_name='patient_symptoms')
     op.drop_table('patient_symptoms')
     op.drop_index(op.f('ix_medications_prescribed_by'), table_name='medications')
     op.drop_index(op.f('ix_medications_patient_id'), table_name='medications')
     op.drop_index(op.f('ix_medications_id'), table_name='medications')
     op.drop_table('medications')
-    op.drop_index(op.f('ix_medical_history_patient_id'), table_name='medical_history')
-    op.drop_index(op.f('ix_medical_history_id'), table_name='medical_history')
-    op.drop_index(op.f('ix_medical_history_doctor_id'), table_name='medical_history')
-    op.drop_table('medical_history')
     op.drop_index(op.f('ix_document_chunks_id'), table_name='document_chunks')
-    op.drop_index('idx_document_chunk_symptoms', table_name='document_chunks')
-    op.drop_index('idx_document_chunk_index', table_name='document_chunks')
     op.drop_index('idx_document_chunk_document', table_name='document_chunks')
-    op.drop_index('idx_document_chunk_diseases', table_name='document_chunks')
     op.drop_table('document_chunks')
     op.drop_index(op.f('ix_doctor_availability_id'), table_name='doctor_availability')
     op.drop_index(op.f('ix_doctor_availability_doctor_id'), table_name='doctor_availability')
     op.drop_table('doctor_availability')
-    op.drop_index(op.f('ix_appointments_scheduled_date'), table_name='appointments')
-    op.drop_index(op.f('ix_appointments_patient_id'), table_name='appointments')
-    op.drop_index(op.f('ix_appointments_id'), table_name='appointments')
-    op.drop_index(op.f('ix_appointments_doctor_id'), table_name='appointments')
-    op.drop_table('appointments')
     op.drop_index(op.f('ix_allergies_patient_id'), table_name='allergies')
     op.drop_index(op.f('ix_allergies_id'), table_name='allergies')
     op.drop_table('allergies')
     op.drop_index(op.f('ix_user_profiles_id'), table_name='user_profiles')
     op.drop_table('user_profiles')
     op.drop_index(op.f('ix_symptoms_id'), table_name='symptoms')
-    op.drop_index('idx_symptom_urgency', table_name='symptoms')
-    op.drop_index('idx_symptom_specialty', table_name='symptoms')
     op.drop_index('idx_symptom_name', table_name='symptoms')
-    op.drop_index('idx_symptom_category', table_name='symptoms')
     op.drop_table('symptoms')
     op.drop_index(op.f('ix_patients_id'), table_name='patients')
     op.drop_table('patients')
@@ -640,8 +576,6 @@ def downgrade():
     op.drop_index(op.f('ix_medical_documents_file_hash'), table_name='medical_documents')
     op.drop_index('idx_medical_document_type', table_name='medical_documents')
     op.drop_index('idx_medical_document_status', table_name='medical_documents')
-    op.drop_index('idx_medical_document_specialty', table_name='medical_documents')
-    op.drop_index('idx_medical_document_diseases', table_name='medical_documents')
     op.drop_table('medical_documents')
     op.drop_index(op.f('ix_doctors_medical_license_number'), table_name='doctors')
     op.drop_index(op.f('ix_doctors_id'), table_name='doctors')
@@ -654,8 +588,6 @@ def downgrade():
     op.drop_index('idx_system_metrics_recorded', table_name='system_metrics')
     op.drop_table('system_metrics')
     op.drop_index(op.f('ix_model_metrics_id'), table_name='model_metrics')
-    op.drop_index('idx_model_metrics_type', table_name='model_metrics')
-    op.drop_index('idx_model_metrics_period', table_name='model_metrics')
     op.drop_index('idx_model_metrics_name_version', table_name='model_metrics')
     op.drop_table('model_metrics')
     # ### end Alembic commands ###
